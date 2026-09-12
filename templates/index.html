@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thủy vân số — Mã hóa &amp; Giấu tin</title>
+<style>
+  :root {
+    --nen: #12161c;
+    --nen-tam: #191f27;
+    --vien: #2a323d;
+    --vien-sang: #3a4551;
+    --chu: #e7ebef;
+    --chu-mo: #8b95a1;
+    --dong: #c98a4b;
+    --dong-sang: #e0a469;
+    --xanh: #4fae9f;
+    --do: #d97462;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--nen);
+    color: var(--chu);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+
+  .khung {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+
+  header {
+    margin-bottom: 56px;
+  }
+
+  header .ky-hieu {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-family: Georgia, "Source Serif 4", serif;
+    font-size: 2.1rem;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    color: var(--chu);
+  }
+
+  header p {
+    color: var(--chu-mo);
+    font-size: 0.98rem;
+    max-width: 480px;
+    margin: 0;
+  }
+
+  section.panel {
+    border-top: 2px solid var(--dong);
+    background: var(--nen-tam);
+    padding: 28px 28px 30px;
+    margin-bottom: 28px;
+  }
+
+  section.panel h2 {
+    font-family: Georgia, "Source Serif 4", serif;
+    font-weight: 500;
+    font-size: 1.25rem;
+    margin: 0 0 6px;
+  }
+
+  section.panel .mo-ta {
+    color: var(--chu-mo);
+    font-size: 0.9rem;
+    margin: 0 0 22px;
+  }
+
+  label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--chu-mo);
+    margin: 16px 0 6px;
+  }
+
+  label:first-of-type { margin-top: 0; }
+
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  textarea,
+  select {
+    width: 100%;
+    background: var(--nen);
+    border: 1px solid var(--vien);
+    color: var(--chu);
+    padding: 10px 12px;
+    font-size: 0.92rem;
+    border-radius: 4px;
+    font-family: inherit;
+  }
+
+  textarea {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    resize: vertical;
+    min-height: 84px;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--dong-sang);
+  }
+
+  input[type="file"] {
+    width: 100%;
+    color: var(--chu-mo);
+    font-size: 0.85rem;
+    padding: 8px 0;
+  }
+
+  .hang-doi {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  button {
+    margin-top: 22px;
+    background: var(--dong);
+    color: #1a1408;
+    border: none;
+    padding: 11px 20px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button:hover { background: var(--dong-sang); }
+  button:disabled { background: var(--vien); color: var(--chu-mo); cursor: wait; }
+
+  button.phu {
+    background: transparent;
+    border: 1px solid var(--vien-sang);
+    color: var(--chu);
+    margin-left: 10px;
+    padding: 11px 16px;
+  }
+  button.phu:hover { border-color: var(--dong); }
+
+  .ket-qua {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border-radius: 4px;
+    font-size: 0.88rem;
+    display: none;
+  }
+
+  .ket-qua.hien { display: block; }
+  .ket-qua.thanh-cong { background: rgba(79, 174, 159, 0.12); border: 1px solid var(--xanh); color: #b6e6dd; }
+  .ket-qua.loi { background: rgba(217, 116, 98, 0.12); border: 1px solid var(--do); color: #f2c1b6; }
+
+  .ket-qua a.tai-ve {
+    display: inline-block;
+    margin-top: 10px;
+    color: var(--dong-sang);
+    font-weight: 600;
+    text-decoration: none;
+    border-bottom: 1px solid var(--dong-sang);
+  }
+
+  .ket-qua img {
+    max-width: 100%;
+    margin-top: 12px;
+    border: 1px solid var(--vien);
+    border-radius: 4px;
+  }
+
+  .canh-bao {
+    font-size: 0.82rem;
+    color: var(--chu-mo);
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--vien);
+  }
+
+  footer {
+    color: var(--chu-mo);
+    font-size: 0.82rem;
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  @media (max-width: 560px) {
+    .hang-doi { grid-template-columns: 1fr; }
+    .khung { padding: 40px 18px 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="khung">
+
+  <header>
+    <svg class="ky-hieu" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="10" width="16" height="11" rx="1.5" stroke="#c98a4b" stroke-width="1.6"/>
+      <path d="M7 10V7a5 5 0 0 1 10 0v3" stroke="#c98a4b" stroke-width="1.6"/>
+      <circle cx="12" cy="15" r="1.4" fill="#c98a4b"/>
+    </svg>
+    <h1>Thủy vân số</h1>
+    <p>Sinh khóa RSA, mã hóa watermark bằng AES / ChaCha20 / RSA, và giấu vào ảnh bằng kỹ thuật LSB — mọi thứ xử lý trong bộ nhớ, không lưu lại phía máy chủ.</p>
+  </header>
+
+  <!-- ================= SINH KHÓA RSA ================= -->
+  <section class="panel">
+    <h2>Sinh cặp khóa RSA</h2>
+    <p class="mo-ta">Dùng khi bạn chọn thuật toán RSA bên dưới. Khóa chỉ hiện ra đây một lần — hãy tự lưu lại, máy chủ không giữ bản sao nào.</p>
+
+    <label for="do-dai-bit">Độ dài khóa (bit)</label>
+    <select id="do-dai-bit">
+      <option value="2048" selected>2048</option>
+      <option value="3072">3072</option>
+      <option value="4096">4096</option>
+    </select>
+
+    <button id="btn-tao-khoa" type="button">Sinh khóa</button>
+
+    <div id="ket-qua-khoa" class="ket-qua">
+      <label for="khoa-cong-khai">Khóa công khai (dùng để mã hóa / nhúng)</label>
+      <textarea id="khoa-cong-khai" readonly rows="6"></textarea>
+      <button class="phu" type="button" data-sao-chep="khoa-cong-khai">Sao chép</button>
+
+      <label for="khoa-rieng-tu">Khóa riêng tư (dùng để giải mã / trích xuất)</label>
+      <textarea id="khoa-rieng-tu" readonly rows="10"></textarea>
+      <button class="phu" type="button" data-sao-chep="khoa-rieng-tu">Sao chép</button>
+    </div>
+  </section>
+
+  <!-- ================= NHÚNG WATERMARK ================= -->
+  <section class="panel">
+    <h2>Nhúng watermark vào ảnh</h2>
+    <p class="mo-ta">Mã hóa văn bản rồi giấu vào ảnh. Tải ảnh kết quả về máy — máy chủ không giữ lại ảnh gốc lẫn ảnh sau khi nhúng.</p>
+
+    <label for="nhung-anh">Ảnh gốc</label>
+    <input type="file" id="nhung-anh" accept="image/*">
+
+    <label for="nhung-watermark">Watermark (văn bản cần giấu)</label>
+    <textarea id="nhung-watermark" rows="3" placeholder="Ví dụ: Bản quyền thuộc về Nguyễn Văn A, 2026"></textarea>
+
+    <div class="hang-doi">
+      <div>
+        <label for="nhung-thuat-toan">Thuật toán</label>
+        <select id="nhung-thuat-toan">
+          <option value="AES">AES</option>
+          <option value="CHACHA20">ChaCha20</option>
+          <option value="RSA">RSA</option>
+        </select>
+      </div>
+      <div>
+        <label for="nhung-khoa" id="nhan-nhung-khoa">Mật khẩu</label>
+        <input type="password" id="nhung-khoa" placeholder="Nhập mật khẩu">
+      </div>
+    </div>
+
+    <button id="btn-nhung" type="button">Mã hóa &amp; nhúng</button>
+
+    <div id="ket-qua-nhung" class="ket-qua"></div>
+  </section>
+
+  <!-- ================= TRÍCH XUẤT WATERMARK ================= -->
+  <section class="panel">
+    <h2>Trích xuất watermark</h2>
+    <p class="mo-ta">Đọc lại watermark từ ảnh đã nhúng. Cần đúng thuật toán và khóa đã dùng lúc nhúng (khóa riêng tư nếu là RSA).</p>
+
+    <label for="trich-anh">Ảnh đã nhúng</label>
+    <input type="file" id="trich-anh" accept="image/*">
+
+    <div class="hang-doi">
+      <div>
+        <label for="trich-thuat-toan">Thuật toán</label>
+        <select id="trich-thuat-toan">
+          <option value="AES">AES</option>
+          <option value="CHACHA20">ChaCha20</option>
+          <option value="RSA">RSA</option>
+        </select>
+      </div>
+      <div>
+        <label for="trich-khoa" id="nhan-trich-khoa">Mật khẩu</label>
+        <input type="password" id="trich-khoa" placeholder="Nhập mật khẩu">
+      </div>
+    </div>
+
+    <button id="btn-trich-xuat" type="button">Trích xuất &amp; giải mã</button>
+
+    <div id="ket-qua-trich" class="ket-qua"></div>
+  </section>
+
+  <footer>Đồ án Nhập môn Mật mã học — xử lý hoàn toàn trong bộ nhớ (RAM), không ghi file lên máy chủ.</footer>
+</div>
+
+<script>
+// ---------- Tiện ích chung ----------
+function hienKetQua(vungHienThi, thanhCong, noiDungHtml) {
+  vungHienThi.className = "ket-qua hien " + (thanhCong ? "thanh-cong" : "loi");
+  vungHienThi.innerHTML = noiDungHtml;
+}
+
+function capNhatNhanKhoa(idThuatToan, idNhan, idOInput) {
+  const thuatToan = document.getElementById(idThuatToan).value;
+  const nhan = document.getElementById(idNhan);
+  const oInput = document.getElementById(idOInput);
+  if (thuatToan === "RSA") {
+    nhan.textContent = idNhan.includes("nhung") ? "Khóa công khai (dán PEM)" : "Khóa riêng tư (dán PEM)";
+    oInput.placeholder = "-----BEGIN ... KEY-----";
+  } else {
+    nhan.textContent = "Mật khẩu";
+    oInput.placeholder = "Nhập mật khẩu";
+  }
+}
+
+document.getElementById("nhung-thuat-toan").addEventListener("change", () =>
+  capNhatNhanKhoa("nhung-thuat-toan", "nhan-nhung-khoa", "nhung-khoa"));
+document.getElementById("trich-thuat-toan").addEventListener("change", () =>
+  capNhatNhanKhoa("trich-thuat-toan", "nhan-trich-khoa", "trich-khoa"));
+
+// ---------- 1. Sinh khóa RSA ----------
+document.getElementById("btn-tao-khoa").addEventListener("click", async () => {
+  const nut = document.getElementById("btn-tao-khoa");
+  const doDaiBit = document.getElementById("do-dai-bit").value;
+  nut.disabled = true;
+  nut.textContent = "Đang sinh khóa...";
+
+  try {
+    const res = await fetch("/api/rsa/tao-khoa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ do_dai_bit: parseInt(doDaiBit, 10) })
+    });
+    const data = await res.json();
+
+    if (data.thanh_cong) {
+      document.getElementById("khoa-cong-khai").value = data.khoa_cong_khai;
+      document.getElementById("khoa-rieng-tu").value = data.khoa_rieng_tu;
+      document.getElementById("ket-qua-khoa").className = "ket-qua hien";
+    } else {
+      alert("Lỗi khi sinh khóa: " + data.loi);
+    }
+  } catch (err) {
+    alert("Không thể kết nối tới máy chủ: " + err.message);
+  } finally {
+    nut.disabled = false;
+    nut.textContent = "Sinh khóa";
+  }
+});
+
+document.querySelectorAll("[data-sao-chep]").forEach(nut => {
+  nut.addEventListener("click", () => {
+    const oNhap = document.getElementById(nut.dataset.saoChep);
+    oNhap.select();
+    navigator.clipboard.writeText(oNhap.value).then(() => {
+      const chuGoc = nut.textContent;
+      nut.textContent = "Đã sao chép";
+      setTimeout(() => { nut.textContent = chuGoc; }, 1500);
+    });
+  });
+});
+
+// ---------- 2. Nhúng watermark ----------
+document.getElementById("btn-nhung").addEventListener("click", async () => {
+  const oAnh = document.getElementById("nhung-anh");
+  const watermark = document.getElementById("nhung-watermark").value.trim();
+  const thuatToan = document.getElementById("nhung-thuat-toan").value;
+  const khoa = document.getElementById("nhung-khoa").value.trim();
+  const vungHienThi = document.getElementById("ket-qua-nhung");
+  const nut = document.getElementById("btn-nhung");
+
+  if (!oAnh.files[0]) { hienKetQua(vungHienThi, false, "Vui lòng chọn ảnh gốc."); return; }
+  if (!watermark) { hienKetQua(vungHienThi, false, "Vui lòng nhập watermark."); return; }
+  if (!khoa) { hienKetQua(vungHienThi, false, "Vui lòng nhập khóa."); return; }
+
+  const duLieu = new FormData();
+  duLieu.append("anh", oAnh.files[0]);
+  duLieu.append("watermark", watermark);
+  duLieu.append("thuat_toan", thuatToan);
+  duLieu.append("khoa", khoa);
+
+  nut.disabled = true;
+  nut.textContent = "Đang xử lý...";
+
+  try {
+    const res = await fetch("/api/nhung", { method: "POST", body: duLieu });
+
+    if (!res.ok) {
+      const loi = await res.json();
+      hienKetQua(vungHienThi, false, "Lỗi: " + (loi.loi || "Không xác định."));
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    hienKetQua(vungHienThi, true,
+      `Đã nhúng thành công.<br><a class="tai-ve" href="${url}" download="anh_da_nhung_watermark.png">Tải ảnh về</a><br><img src="${url}" alt="Ảnh đã nhúng watermark">`);
+  } catch (err) {
+    hienKetQua(vungHienThi, false, "Không thể kết nối tới máy chủ: " + err.message);
+  } finally {
+    nut.disabled = false;
+    nut.textContent = "Mã hóa & nhúng";
+  }
+});
+
+// ---------- 3. Trích xuất watermark ----------
+document.getElementById("btn-trich-xuat").addEventListener("click", async () => {
+  const oAnh = document.getElementById("trich-anh");
+  const thuatToan = document.getElementById("trich-thuat-toan").value;
+  const khoa = document.getElementById("trich-khoa").value.trim();
+  const vungHienThi = document.getElementById("ket-qua-trich");
+  const nut = document.getElementById("btn-trich-xuat");
+
+  if (!oAnh.files[0]) { hienKetQua(vungHienThi, false, "Vui lòng chọn ảnh đã nhúng."); return; }
+  if (!khoa) { hienKetQua(vungHienThi, false, "Vui lòng nhập khóa."); return; }
+
+  const duLieu = new FormData();
+  duLieu.append("anh", oAnh.files[0]);
+  duLieu.append("thuat_toan", thuatToan);
+  duLieu.append("khoa", khoa);
+
+  nut.disabled = true;
+  nut.textContent = "Đang xử lý...";
+
+  try {
+    const res = await fetch("/api/trich-xuat", { method: "POST", body: duLieu });
+    const data = await res.json();
+
+    if (data.thanh_cong) {
+      hienKetQua(vungHienThi, true, `Watermark: <strong>${data.watermark.replace(/</g, "&lt;")}</strong>`);
+    } else {
+      hienKetQua(vungHienThi, false, "Lỗi: " + data.loi);
+    }
+  } catch (err) {
+    hienKetQua(vungHienThi, false, "Không thể kết nối tới máy chủ: " + err.message);
+  } finally {
+    nut.disabled = false;
+    nut.textContent = "Trích xuất & giải mã";
+  }
+});
+</script>
+</body>
+</html>
