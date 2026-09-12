@@ -1,43 +1,50 @@
+"""
+Backend xử lý nhúng/trích xuất watermark bằng kỹ thuật LSB (Least Significant Bit).
+"""
+ 
 from PIL import Image
-import hashlib
-import base64
-from Crypto.Cipher import AES, ChaCha20, PKCS1_OAEP
-from Crypto.PublicKey import RSA
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA256
-from Crypto.Random import get_random_bytes
-
+from thuat_toan_ma_hoa import ky_so_rsa, kiem_tra_ky_so_rsa
+ 
+ 
 def kiem_tra_suc_chua(anh_goc, encrypt):
+    """
+    Kiểm tra ảnh có đủ dung lượng để nhúng bản mã.
+    
+    Args:
+        anh_goc: BytesIO hoặc file ảnh
+        encrypt: bản mã (str)
+    
+    Returns:
+        True nếu đủ dung lượng, False nếu không
+    """
     img = Image.open(anh_goc)
     rong, cao = img.size
     
-    # 1. Tính tổng số bit ảnh có thể giấu (RGB = 3 bit/pixel)
-    tong_pixel = rong * cao
-    suc_chua_bits = tong_pixel * 3
-    suc_chua_bytes = suc_chua_bits // 8
+    # Số bit có thể giấu: 3 bit/pixel (RGB), mỗi byte 8 bit
+    suc_chua_bits = rong * cao * 3
     
-    # 2. Tính số bit của thông điệp (+ 16 bit ngắt)
-    do_dai_van_ban_bits = len(encrypt.encode('utf-8')) * 8 + 16
+    # Dữ liệu cần giấu: bản mã + 16 bit ngắt
+    du_lieu_bits = len(encrypt.encode('utf-8')) * 8 + 16
     
-    # 4. Trả về True nếu chứa đủ, False nếu không đủ
-    if do_dai_van_ban_bits <= suc_chua_bits:
-        print("=> Kết quả: DỦ DUNG LƯỢNG để nhúng.\n")
-        return True
-    else:
-        print("=> Kết quả: KHÔNG ĐỦ DUNG LƯỢNG!\n")
-        return False
-
-
+    return du_lieu_bits <= suc_chua_bits
+ 
+ 
 def nhung_thong_diep(anh_goc, anh_dich, encrypt):
-    # Kiểm tra độ dài trước khi xử lý
+    """
+    Nhúng thông điệp (bản mã) vào ảnh bằng LSB.
+    
+    Args:
+        anh_goc: BytesIO ảnh gốc
+        anh_dich: BytesIO kết quả (sẽ ghi ảnh PNG)
+        encrypt: bản mã (str - chuỗi Base64 từ mã hóa)
+    """
     if not kiem_tra_suc_chua(anh_goc, encrypt):
-        print("Hủy quá trình nhúng do thông điệp quá dài!")
-        return
-
+        raise ValueError("Ảnh không đủ dung lượng để nhúng bản mã")
+    
     img = Image.open(anh_goc).convert('RGB')
     pixels = list(img.getdata())
     
-    # Chuyển văn bản sang chuỗi bit (kèm 16 bit '1' ngắt đuôi)
+    # Chuyển bản mã sang chuỗi bit, thêm 16 bit ngắt ở cuối
     chuoi_bit = ''.join(format(ord(c), '08b') for c in encrypt) + '1111111111111110'
     
     idx = 0
@@ -51,256 +58,92 @@ def nhung_thong_diep(anh_goc, anh_dich, encrypt):
                 kenh_mau[i] = (kenh_mau[i] & ~1) | bit
                 idx += 1
         new_pixels.append(tuple(kenh_mau))
-        
+    
     img_moi = Image.new(img.mode, img.size)
     img_moi.putdata(new_pixels)
     img_moi.save(anh_dich, 'PNG')
-    print("Đã nhúng thông điệp thành công!")
+ 
+ 
 def trich_xuat_thong_diep(anh_da_nhung):
     """
-    Đọc lại chuỗi bit đã giấu trong ảnh bằng LSB, dừng khi gặp
-    16 bit ngắt '1111111111111110' (khớp với nhung_thong_diep()).
-    Trả về chuỗi văn bản đã nhúng (chính là bản mã Base64 nếu đã mã hóa trước đó).
+    Trích xuất thông điệp từ ảnh bằng LSB.
+    
+    Đọc lại chuỗi bit, dừng khi gặp ký hiệu ngắt '1111111111111110'.
+    
+    Args:
+        anh_da_nhung: BytesIO ảnh đã nhúng
+    
+    Returns:
+        Bản mã (str) hoặc None nếu không tìm thấy
     """
     img = Image.open(anh_da_nhung).convert('RGB')
     pixels = list(img.getdata())
-
+    
     chuoi_bit = ""
     ky_hieu_ngat = "1111111111111110"
-
+    
     for r, g, b in pixels:
         for kenh in (r, g, b):
             chuoi_bit += str(kenh & 1)
             if chuoi_bit.endswith(ky_hieu_ngat):
+                # Bỏ ký hiệu ngắt, chuyển bit thành văn bản
                 chuoi_bit = chuoi_bit[:-len(ky_hieu_ngat)]
-                # Ghép từng nhóm 8 bit thành 1 ký tự
                 van_ban = "".join(
                     chr(int(chuoi_bit[i:i + 8], 2))
                     for i in range(0, len(chuoi_bit), 8)
                 )
                 return van_ban
-
-    print("=> Không tìm thấy ký hiệu ngắt, ảnh có thể không chứa dữ liệu ẩn.")
+    
     return None
-
-
-def tao_hash_thong_diep(van_ban):
-    hash_object = hashlib.sha256(van_ban.encode('utf-8'))
-    return van_ban+hash_object.hexdigest()
-def tao_khoa_tu_mat_khau(mat_khau, salt, do_dai_khoa=32, vong_lap=100_000):
+ 
+ 
+def nhung_voi_chu_ky(anh_goc, anh_dich, watermark_da_ma_hoa, khoa_rieng_tu_rsa):
     """
-    Sinh khóa nhị phân từ mật khẩu do người dùng nhập.
-    - mat_khau: chuỗi khóa người dùng nhập (str)
-    - salt: bytes ngẫu nhiên dùng để tăng độ an toàn (nên lưu kèm bản mã)
-    - do_dai_khoa: độ dài khóa mong muốn (byte), mặc định 32 byte = 256 bit
+    Nhúng watermark + chữ ký số RSA vào ảnh.
+    
+    Cấu trúc: watermark_da_ma_hoa + "|" + chu_ky_rsa_base64
+    
+    Args:
+        anh_goc: BytesIO ảnh gốc
+        anh_dich: BytesIO kết quả
+        watermark_da_ma_hoa: bản mã Base64
+        khoa_rieng_tu_rsa: khóa riêng tư PEM để ký
     """
-    khoa = PBKDF2(
-        mat_khau.encode('utf-8'),
-        salt,
-        dkLen=do_dai_khoa,
-        count=vong_lap,
-        hmac_hash_module=SHA256
-    )
-    return khoa
+    # Ký watermark bằng RSA
+    chu_ky = ky_so_rsa(watermark_da_ma_hoa, khoa_rieng_tu_rsa)
+    
+    # Gộp bản mã + chữ ký
+    du_lieu_gop = f"{watermark_da_ma_hoa}|{chu_ky}"
+    
+    # Nhúng vào ảnh
+    nhung_thong_diep(anh_goc, anh_dich, du_lieu_gop)
  
  
-# ============================================================
-# 1. AES - GCM (mã hóa đối xứng, có xác thực)
-# ============================================================
-def ma_hoa_aes(van_ban_goc, mat_khau):
+def trich_xuat_va_kiem_tra_chu_ky(anh_da_nhung, khoa_cong_khai_rsa):
     """
-    Mã hóa văn bản bằng AES-GCM.
-    Trả về 1 chuỗi Base64 gồm: salt (16 byte) + nonce (16 byte) + tag (16 byte) + bản mã
-    -> Có thể truyền thẳng chuỗi này vào nhung_thong_diep().
+    Trích xuất watermark và xác minh chữ ký RSA.
+    
+    Returns:
+        (watermark_da_ma_hoa, kem_theo_chu_ky) 
+        - watermark_da_ma_hoa: bản mã nếu chữ ký hợp lệ, None nếu lỗi
+        - kem_theo_chu_ky: True nếu chứa chữ ký, False nếu không
     """
-    salt = get_random_bytes(16)
-    khoa = tao_khoa_tu_mat_khau(mat_khau, salt)
- 
-    cipher = AES.new(khoa, AES.MODE_GCM)
-    ban_ma, tag = cipher.encrypt_and_digest(van_ban_goc.encode('utf-8'))
- 
-    # Gộp tất cả thành phần cần thiết để giải mã lại về sau
-    du_lieu_gop = salt + cipher.nonce + tag + ban_ma
-    return base64.b64encode(du_lieu_gop).decode('utf-8')
- 
- 
-def giai_ma_aes(chuoi_base64, mat_khau):
-    """
-    Giải mã chuỗi Base64 được tạo bởi ma_hoa_aes().
-    Trả về văn bản gốc (str), hoặc None nếu sai khóa / dữ liệu bị thay đổi.
-    """
-    try:
-        du_lieu_gop = base64.b64decode(chuoi_base64)
- 
-        salt = du_lieu_gop[:16]
-        nonce = du_lieu_gop[16:32]
-        tag = du_lieu_gop[32:48]
-        ban_ma = du_lieu_gop[48:]
- 
-        khoa = tao_khoa_tu_mat_khau(mat_khau, salt)
-        cipher = AES.new(khoa, AES.MODE_GCM, nonce=nonce)
-        van_ban_goc = cipher.decrypt_and_verify(ban_ma, tag)
- 
-        return van_ban_goc.decode('utf-8')
-    except (ValueError, KeyError):
-        # Sai khóa hoặc dữ liệu bị hỏng/sửa đổi -> AES-GCM sẽ phát hiện được
-        print("=> Lỗi: Sai khóa hoặc dữ liệu đã bị thay đổi (AES).")
-        return None
- 
- 
-# ============================================================
-# 2. ChaCha20 (mã hóa đối xứng, mã dòng)
-# ============================================================
-def ma_hoa_chacha20(van_ban_goc, mat_khau):
-    """
-    Mã hóa văn bản bằng ChaCha20.
-    Trả về 1 chuỗi Base64 gồm: salt (16 byte) + nonce (8 byte) + bản mã
-    -> Có thể truyền thẳng chuỗi này vào nhung_thong_diep().
-    """
-    salt = get_random_bytes(16)
-    khoa = tao_khoa_tu_mat_khau(mat_khau, salt)
- 
-    cipher = ChaCha20.new(key=khoa)
-    ban_ma = cipher.encrypt(van_ban_goc.encode('utf-8'))
- 
-    du_lieu_gop = salt + cipher.nonce + ban_ma
-    return base64.b64encode(du_lieu_gop).decode('utf-8')
- 
- 
-def giai_ma_chacha20(chuoi_base64, mat_khau):
-    """
-    Giải mã chuỗi Base64 được tạo bởi ma_hoa_chacha20().
-    Trả về văn bản gốc (str), hoặc None nếu có lỗi.
-    """
-    try:
-        du_lieu_gop = base64.b64decode(chuoi_base64)
- 
-        salt = du_lieu_gop[:16]
-        nonce = du_lieu_gop[16:24]   # ChaCha20 nonce mặc định 8 byte
-        ban_ma = du_lieu_gop[24:]
- 
-        khoa = tao_khoa_tu_mat_khau(mat_khau, salt)
-        cipher = ChaCha20.new(key=khoa, nonce=nonce)
-        van_ban_goc = cipher.decrypt(ban_ma)
- 
-        return van_ban_goc.decode('utf-8')
-    except (ValueError, UnicodeDecodeError):
-        print("=> Lỗi: Sai khóa hoặc dữ liệu đã bị thay đổi (ChaCha20).")
-        return None
- 
- 
-# ============================================================
-# 3. RSA (mã hóa BẤT ĐỐI XỨNG - dùng cặp khóa công khai/riêng tư)
-# ============================================================
-def tao_cap_khoa_rsa(do_dai_bit=2048):
-    """
-    Sinh cặp khóa RSA (khóa công khai + khóa riêng tư).
-    - do_dai_bit: độ dài khóa, nên dùng 2048 trở lên (mặc định 2048).
-    Trả về tuple (khoa_cong_khai_pem, khoa_rieng_tu_pem) dạng chuỗi (str),
-    để dễ lưu ra file .pem hoặc hiển thị trên giao diện web.
-    """
-    khoa = RSA.generate(do_dai_bit)
-    khoa_rieng_tu_pem = khoa.export_key().decode('utf-8')
-    khoa_cong_khai_pem = khoa.publickey().export_key().decode('utf-8')
-    return khoa_cong_khai_pem, khoa_rieng_tu_pem
- 
- 
-def luu_cap_khoa_rsa(khoa_cong_khai_pem, khoa_rieng_tu_pem,
-                      file_cong_khai="public_key.pem", file_rieng_tu="private_key.pem"):
-    """Lưu 2 khóa ra file .pem để dùng lại về sau."""
-    with open(file_cong_khai, "w") as f:
-        f.write(khoa_cong_khai_pem)
-    with open(file_rieng_tu, "w") as f:
-        f.write(khoa_rieng_tu_pem)
-    print(f"Đã lưu khóa công khai -> {file_cong_khai}")
-    print(f"Đã lưu khóa riêng tư -> {file_rieng_tu}")
- 
- 
-def doc_khoa_rsa_tu_file(duong_dan_file):
-    """Đọc lại khóa RSA (công khai hoặc riêng tư) từ file .pem."""
-    with open(duong_dan_file, "r") as f:
-        return f.read()
- 
- 
-def ma_hoa_rsa(van_ban_goc, khoa_cong_khai_pem):
-    """
-    Mã hóa văn bản bằng RSA (dùng khóa CÔNG KHAI), đệm PKCS1_OAEP.
-    Lưu ý: RSA chỉ mã hóa được dữ liệu ngắn (giới hạn theo độ dài khóa,
-    ví dụ khóa 2048-bit mã hóa tối đa ~190 byte dữ liệu mỗi lần).
-    -> Vì vậy RSA thường dùng để mã hóa 1 khóa đối xứng (AES/ChaCha20)
-       chứ không dùng để mã hóa trực tiếp watermark dài.
-    Trả về chuỗi Base64.
-    """
-    khoa_cong_khai = RSA.import_key(khoa_cong_khai_pem)
-    cipher = PKCS1_OAEP.new(khoa_cong_khai)
-    ban_ma = cipher.encrypt(van_ban_goc.encode('utf-8'))
-    return base64.b64encode(ban_ma).decode('utf-8')
- 
- 
-def giai_ma_rsa(chuoi_base64, khoa_rieng_tu_pem):
-    """
-    Giải mã chuỗi Base64 được tạo bởi ma_hoa_rsa(), dùng khóa RIÊNG TƯ.
-    Trả về văn bản gốc (str), hoặc None nếu sai khóa / dữ liệu bị hỏng.
-    """
-    try:
-        khoa_rieng_tu = RSA.import_key(khoa_rieng_tu_pem)
-        cipher = PKCS1_OAEP.new(khoa_rieng_tu)
-        ban_ma = base64.b64decode(chuoi_base64)
-        van_ban_goc = cipher.decrypt(ban_ma)
-        return van_ban_goc.decode('utf-8')
-    except (ValueError, TypeError):
-        print("=> Lỗi: Sai khóa hoặc dữ liệu đã bị thay đổi (RSA).")
-        return None
- 
- 
-def rsa_ma_hoa_khoa_doi_xung(khoa_doi_xung_bytes, khoa_cong_khai_pem):
-    """
-    Mô hình lai (hybrid) thường dùng trong thực tế:
-    Dùng RSA để mã hóa MỘT KHÓA ĐỐI XỨNG (vd khóa AES 32 byte),
-    sau đó dùng khóa đối xứng đó để mã hóa watermark (nhanh hơn nhiều so với
-    mã hóa trực tiếp văn bản dài bằng RSA).
-    Trả về chuỗi Base64 của khóa đối xứng đã được mã hóa bằng RSA.
-    """
-    khoa_cong_khai = RSA.import_key(khoa_cong_khai_pem)
-    cipher = PKCS1_OAEP.new(khoa_cong_khai)
-    khoa_da_ma_hoa = cipher.encrypt(khoa_doi_xung_bytes)
-    return base64.b64encode(khoa_da_ma_hoa).decode('utf-8')
- 
- 
-def rsa_giai_ma_khoa_doi_xung(chuoi_base64, khoa_rieng_tu_pem):
-    """Giải mã lại khóa đối xứng đã được mã hóa bằng RSA (xem hàm trên)."""
-    khoa_rieng_tu = RSA.import_key(khoa_rieng_tu_pem)
-    cipher = PKCS1_OAEP.new(khoa_rieng_tu)
-    khoa_da_ma_hoa = base64.b64decode(chuoi_base64)
-    return cipher.decrypt(khoa_da_ma_hoa)
- 
- 
-# ============================================================
-# 4. HÀM ĐIỀU PHỐI: Chọn thuật toán theo lựa chọn người dùng
-#    (dùng để nối với giao diện web - dropdown chọn thuật toán)
-# ============================================================
-def ma_hoa(van_ban_goc, mat_khau, thuat_toan="AES"):
-    """
-    thuat_toan: "AES" hoặc "CHACHA20"
-    """
-    thuat_toan = thuat_toan.upper()
-    if thuat_toan == "AES":
-        return ma_hoa_aes(van_ban_goc, mat_khau)
-    elif thuat_toan == "CHACHA20":
-        return ma_hoa_chacha20(van_ban_goc, mat_khau)
+    du_lieu = trich_xuat_thong_diep(anh_da_nhung)
+    
+    if du_lieu is None:
+        return None, False
+    
+    # Kiểm tra có chữ ký không (định dạng: "bản_mã|chữ_ký")
+    if '|' not in du_lieu:
+        return du_lieu, False
+    
+    watermark_da_ma_hoa, chu_ky = du_lieu.rsplit('|', 1)
+    
+    # Xác minh chữ ký
+    hop_le = kiem_tra_ky_so_rsa(watermark_da_ma_hoa, chu_ky, khoa_cong_khai_rsa)
+    
+    if hop_le:
+        return watermark_da_ma_hoa, True
     else:
-        raise ValueError(f"Thuật toán '{thuat_toan}' không được hỗ trợ.")
- 
- 
-def giai_ma(chuoi_base64, mat_khau, thuat_toan="AES"):
-    """
-    thuat_toan: "AES" hoặc "CHACHA20"
-    """
-    thuat_toan = thuat_toan.upper()
-    if thuat_toan == "AES":
-        return giai_ma_aes(chuoi_base64, mat_khau)
-    elif thuat_toan == "CHACHA20":
-        return giai_ma_chacha20(chuoi_base64, mat_khau)
-    else:
-        raise ValueError(f"Thuật toán '{thuat_toan}' không được hỗ trợ.")
+        return None, False
  

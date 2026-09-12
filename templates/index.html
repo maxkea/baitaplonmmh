@@ -265,7 +265,13 @@
       <div>
         <label for="nhung-khoa" id="nhan-nhung-khoa">Mật khẩu</label>
         <input type="password" id="nhung-khoa" placeholder="Nhập mật khẩu">
+        <textarea id="nhung-khoa-rsa" rows="6" style="display:none;" placeholder="-----BEGIN PUBLIC KEY-----"></textarea>
       </div>
+    </div>
+
+    <div id="nhung-vung-chu-ky" style="display:none;">
+      <label for="nhung-khoa-rieng-tu-rsa">Khóa riêng tư RSA — tùy chọn, để ký watermark (dán PEM)</label>
+      <textarea id="nhung-khoa-rieng-tu-rsa" rows="6" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;(để trống nếu không cần ký chữ ký số)"></textarea>
     </div>
 
     <button id="btn-nhung" type="button">Mã hóa &amp; nhúng</button>
@@ -293,7 +299,13 @@
       <div>
         <label for="trich-khoa" id="nhan-trich-khoa">Mật khẩu</label>
         <input type="password" id="trich-khoa" placeholder="Nhập mật khẩu">
+        <textarea id="trich-khoa-rsa" rows="6" style="display:none;" placeholder="-----BEGIN RSA PRIVATE KEY-----"></textarea>
       </div>
+    </div>
+
+    <div id="trich-vung-chu-ky" style="display:none;">
+      <label for="trich-khoa-cong-khai-rsa">Khóa công khai RSA — tùy chọn, để xác minh chữ ký (dán PEM)</label>
+      <textarea id="trich-khoa-cong-khai-rsa" rows="6" placeholder="-----BEGIN PUBLIC KEY-----&#10;(để trống nếu ảnh không có chữ ký số)"></textarea>
     </div>
 
     <button id="btn-trich-xuat" type="button">Trích xuất &amp; giải mã</button>
@@ -311,23 +323,50 @@ function hienKetQua(vungHienThi, thanhCong, noiDungHtml) {
   vungHienThi.innerHTML = noiDungHtml;
 }
 
-function capNhatNhanKhoa(idThuatToan, idNhan, idOInput) {
+function capNhatNhanKhoa(idThuatToan, idNhan, idOInput, idOTextarea) {
   const thuatToan = document.getElementById(idThuatToan).value;
   const nhan = document.getElementById(idNhan);
   const oInput = document.getElementById(idOInput);
+  const oTextarea = document.getElementById(idOTextarea);
   if (thuatToan === "RSA") {
     nhan.textContent = idNhan.includes("nhung") ? "Khóa công khai (dán PEM)" : "Khóa riêng tư (dán PEM)";
-    oInput.placeholder = "-----BEGIN ... KEY-----";
+    // PEM có nhiều dòng — bắt buộc dùng textarea, input 1 dòng sẽ làm mất newline và hỏng khóa
+    oTextarea.value = oInput.value; // giữ lại nếu người dùng đã lỡ gõ gì đó
+    oInput.style.display = "none";
+    oTextarea.style.display = "block";
   } else {
     nhan.textContent = "Mật khẩu";
-    oInput.placeholder = "Nhập mật khẩu";
+    oInput.style.display = "block";
+    oTextarea.style.display = "none";
   }
 }
 
-document.getElementById("nhung-thuat-toan").addEventListener("change", () =>
-  capNhatNhanKhoa("nhung-thuat-toan", "nhan-nhung-khoa", "nhung-khoa"));
-document.getElementById("trich-thuat-toan").addEventListener("change", () =>
-  capNhatNhanKhoa("trich-thuat-toan", "nhan-trich-khoa", "trich-khoa"));
+function layGiaTriKhoa(idThuatToan, idOInput, idOTextarea) {
+  const thuatToan = document.getElementById(idThuatToan).value;
+  return thuatToan === "RSA"
+    ? document.getElementById(idOTextarea).value.trim()
+    : document.getElementById(idOInput).value.trim();
+}
+
+function capNhatVungChuKy(idThuatToan, idVungChuKy) {
+  const thuatToan = document.getElementById(idThuatToan).value;
+  document.getElementById(idVungChuKy).style.display = (thuatToan === "RSA") ? "block" : "none";
+}
+
+document.getElementById("nhung-thuat-toan").addEventListener("change", () => {
+  capNhatNhanKhoa("nhung-thuat-toan", "nhan-nhung-khoa", "nhung-khoa", "nhung-khoa-rsa");
+  capNhatVungChuKy("nhung-thuat-toan", "nhung-vung-chu-ky");
+});
+document.getElementById("trich-thuat-toan").addEventListener("change", () => {
+  capNhatNhanKhoa("trich-thuat-toan", "nhan-trich-khoa", "trich-khoa", "trich-khoa-rsa");
+  capNhatVungChuKy("trich-thuat-toan", "trich-vung-chu-ky");
+});
+
+// Khởi tạo trạng thái hiển thị đúng ngay khi tải trang (phòng khi trình duyệt giữ lại lựa chọn cũ)
+capNhatNhanKhoa("nhung-thuat-toan", "nhan-nhung-khoa", "nhung-khoa", "nhung-khoa-rsa");
+capNhatNhanKhoa("trich-thuat-toan", "nhan-trich-khoa", "trich-khoa", "trich-khoa-rsa");
+capNhatVungChuKy("nhung-thuat-toan", "nhung-vung-chu-ky");
+capNhatVungChuKy("trich-thuat-toan", "trich-vung-chu-ky");
 
 // ---------- 1. Sinh khóa RSA ----------
 document.getElementById("btn-tao-khoa").addEventListener("click", async () => {
@@ -376,7 +415,7 @@ document.getElementById("btn-nhung").addEventListener("click", async () => {
   const oAnh = document.getElementById("nhung-anh");
   const watermark = document.getElementById("nhung-watermark").value.trim();
   const thuatToan = document.getElementById("nhung-thuat-toan").value;
-  const khoa = document.getElementById("nhung-khoa").value.trim();
+  const khoa = layGiaTriKhoa("nhung-thuat-toan", "nhung-khoa", "nhung-khoa-rsa");
   const vungHienThi = document.getElementById("ket-qua-nhung");
   const nut = document.getElementById("btn-nhung");
 
@@ -389,6 +428,13 @@ document.getElementById("btn-nhung").addEventListener("click", async () => {
   duLieu.append("watermark", watermark);
   duLieu.append("thuat_toan", thuatToan);
   duLieu.append("khoa", khoa);
+
+  if (thuatToan === "RSA") {
+    const khoaRiengTuKy = document.getElementById("nhung-khoa-rieng-tu-rsa").value.trim();
+    if (khoaRiengTuKy) {
+      duLieu.append("khoa_rieng_tu_rsa", khoaRiengTuKy);
+    }
+  }
 
   nut.disabled = true;
   nut.textContent = "Đang xử lý...";
@@ -418,7 +464,7 @@ document.getElementById("btn-nhung").addEventListener("click", async () => {
 document.getElementById("btn-trich-xuat").addEventListener("click", async () => {
   const oAnh = document.getElementById("trich-anh");
   const thuatToan = document.getElementById("trich-thuat-toan").value;
-  const khoa = document.getElementById("trich-khoa").value.trim();
+  const khoa = layGiaTriKhoa("trich-thuat-toan", "trich-khoa", "trich-khoa-rsa");
   const vungHienThi = document.getElementById("ket-qua-trich");
   const nut = document.getElementById("btn-trich-xuat");
 
@@ -430,6 +476,13 @@ document.getElementById("btn-trich-xuat").addEventListener("click", async () => 
   duLieu.append("thuat_toan", thuatToan);
   duLieu.append("khoa", khoa);
 
+  if (thuatToan === "RSA") {
+    const khoaCongKhaiXacMinh = document.getElementById("trich-khoa-cong-khai-rsa").value.trim();
+    if (khoaCongKhaiXacMinh) {
+      duLieu.append("khoa_cong_khai_rsa", khoaCongKhaiXacMinh);
+    }
+  }
+
   nut.disabled = true;
   nut.textContent = "Đang xử lý...";
 
@@ -438,7 +491,15 @@ document.getElementById("btn-trich-xuat").addEventListener("click", async () => 
     const data = await res.json();
 
     if (data.thanh_cong) {
-      hienKetQua(vungHienThi, true, `Watermark: <strong>${data.watermark.replace(/</g, "&lt;")}</strong>`);
+      let noiDung = `Watermark: <strong>${data.watermark.replace(/</g, "&lt;")}</strong>`;
+      if (thuatToan === "RSA") {
+        if (data.co_chu_ky && data.chu_ky_hop_le === true) {
+          noiDung += `<br><span style="color:#b6e6dd;">✓ Chữ ký số hợp lệ — ảnh chưa bị thay đổi.</span>`;
+        } else if (data.co_chu_ky) {
+          noiDung += `<br><span style="color:#8b95a1;">ℹ Ảnh có chữ ký số nhưng chưa được xác minh (chưa nhập khóa công khai RSA ở trên).</span>`;
+        }
+      }
+      hienKetQua(vungHienThi, true, noiDung);
     } else {
       hienKetQua(vungHienThi, false, "Lỗi: " + data.loi);
     }
