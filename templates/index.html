@@ -313,6 +313,55 @@
     <div id="ket-qua-trich" class="ket-qua"></div>
   </section>
 
+  <!-- ================= SO SÁNH HIỆU NĂNG ================= -->
+  <section class="panel">
+    <h2>So sánh hiệu năng thuật toán</h2>
+    <p class="mo-ta">So sánh thời gian mã hóa và giải mã của AES, ChaCha20 và RSA trên cùng một văn bản mẫu.</p>
+
+    <label for="ss-van-ban">Văn bản mẫu</label>
+    <textarea id="ss-van-ban" rows="3" placeholder="Nhập văn bản cần mã hóa thử nghiệm để so sánh..."></textarea>
+
+    <div class="hang-doi">
+      <div>
+        <label for="ss-so-lan-lap">Số lần lặp (lấy trung bình)</label>
+        <input type="number" id="ss-so-lan-lap" value="10" min="1" max="1000">
+      </div>
+      <div>
+        <label for="ss-do-dai-bit-rsa">Độ dài khóa RSA (bit)</label>
+        <select id="ss-do-dai-bit-rsa">
+          <option value="1024">1024 (Nhanh)</option>
+          <option value="2048" selected>2048 (An toàn)</option>
+          <option value="3072">3072</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="btn-so-sanh" type="button">Bắt đầu so sánh</button>
+
+    <div id="ket-qua-so-sanh" class="ket-qua"></div>
+  </section>
+
+  <!-- ================= TÍNH PSNR ĐỘC LẬP ================= -->
+  <section class="panel">
+    <h2>Đánh giá chất lượng ảnh (Tính PSNR)</h2>
+    <p class="mo-ta">Tính toán chỉ số PSNR (Peak Signal-to-Noise Ratio) giữa ảnh gốc và ảnh đã nhúng watermark để đánh giá mức độ vô hình.</p>
+
+    <div class="hang-doi">
+      <div>
+        <label for="psnr-anh-goc">Ảnh gốc</label>
+        <input type="file" id="psnr-anh-goc" accept="image/*">
+      </div>
+      <div>
+        <label for="psnr-anh-nhung">Ảnh đã nhúng</label>
+        <input type="file" id="psnr-anh-nhung" accept="image/*">
+      </div>
+    </div>
+
+    <button id="btn-psnr" type="button">Tính toán PSNR</button>
+
+    <div id="ket-qua-psnr" class="ket-qua"></div>
+  </section>
+
   <footer>Đồ án Nhập môn Mật mã học — xử lý hoàn toàn trong bộ nhớ (RAM), không ghi file lên máy chủ.</footer>
 </div>
 
@@ -321,6 +370,17 @@
 function hienKetQua(vungHienThi, thanhCong, noiDungHtml) {
   vungHienThi.className = "ket-qua hien " + (thanhCong ? "thanh-cong" : "loi");
   vungHienThi.innerHTML = noiDungHtml;
+}
+
+function layDanhGiaPsnr(psnr) {
+  if (psnr === null) return "Không thể đánh giá.";
+  if (psnr === "inf") return "Hai ảnh giống hệt nhau (không phát hiện sai khác).";
+  const val = parseFloat(psnr);
+  if (isNaN(val)) return "";
+  if (val >= 40) return "Rất tốt — watermark gần như không thể nhận biết bằng mắt thường.";
+  if (val >= 30) return "Tốt — watermark khó nhận biết bằng mắt thường.";
+  if (val >= 20) return "Trung bình — có thể nhận thấy sai khác nhẹ khi quan sát kỹ.";
+  return "Kém — sai khác dễ nhận biết bằng mắt thường.";
 }
 
 function capNhatNhanKhoa(idThuatToan, idNhan, idOInput, idOTextarea) {
@@ -450,8 +510,18 @@ document.getElementById("btn-nhung").addEventListener("click", async () => {
 
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
+    
+    // Đọc PSNR từ header X-PSNR-DB
+    const psnrDb = res.headers.get("X-PSNR-DB");
+    let thongTinPsnr = "";
+    if (psnrDb) {
+      const psnrText = psnrDb === "inf" ? "Vô hạn (inf)" : `${psnrDb} dB`;
+      const danhGia = layDanhGiaPsnr(psnrDb);
+      thongTinPsnr = `<br><span style="color: var(--xanh); font-weight: bold;">Chỉ số PSNR: ${psnrText}</span> — ${danhGia}<br>`;
+    }
+
     hienKetQua(vungHienThi, true,
-      `Đã nhúng thành công.<br><a class="tai-ve" href="${url}" download="anh_da_nhung_watermark.png">Tải ảnh về</a><br><img src="${url}" alt="Ảnh đã nhúng watermark">`);
+      `Đã nhúng thành công.${thongTinPsnr}<br><a class="tai-ve" href="${url}" download="anh_da_nhung_watermark.png">Tải ảnh về</a><br><img src="${url}" alt="Ảnh đã nhúng watermark">`);
   } catch (err) {
     hienKetQua(vungHienThi, false, "Không thể kết nối tới máy chủ: " + err.message);
   } finally {
@@ -508,6 +578,116 @@ document.getElementById("btn-trich-xuat").addEventListener("click", async () => 
   } finally {
     nut.disabled = false;
     nut.textContent = "Trích xuất & giải mã";
+  }
+});
+
+// ---------- 4. So sánh hiệu năng ----------
+document.getElementById("btn-so-sanh").addEventListener("click", async () => {
+  const vanBan = document.getElementById("ss-van-ban").value.trim();
+  const soLanLap = document.getElementById("ss-so-lan-lap").value;
+  const doDaiBitRsa = document.getElementById("ss-do-dai-bit-rsa").value;
+  const vungHienThi = document.getElementById("ket-qua-so-sanh");
+  const nut = document.getElementById("btn-so-sanh");
+
+  if (!vanBan) { hienKetQua(vungHienThi, false, "Vui lòng nhập văn bản mẫu."); return; }
+
+  nut.disabled = true;
+  nut.textContent = "Đang kiểm tra hiệu năng...";
+
+  try {
+    const res = await fetch("/api/so-sanh-thuat-toan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        van_ban: vanBan,
+        so_lan_lap: parseInt(soLanLap, 10),
+        do_dai_bit_rsa: parseInt(doDaiBitRsa, 10)
+      })
+    });
+    const data = await res.json();
+
+    if (data.thanh_cong) {
+      let html = `<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; margin-top: 14px; background: var(--nen); border: 1px solid var(--vien); border-radius: 4px;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--vien-sang); background: rgba(255,255,255,0.02);">
+            <th style="padding: 10px; color: var(--chu-mo); font-weight: 600;">Thuật toán</th>
+            <th style="padding: 10px; color: var(--chu-mo); font-weight: 600;">Trạng thái</th>
+            <th style="padding: 10px; color: var(--chu-mo); font-weight: 600;">Mã hóa (ms)</th>
+            <th style="padding: 10px; color: var(--chu-mo); font-weight: 600;">Giải mã (ms)</th>
+            <th style="padding: 10px; color: var(--chu-mo); font-weight: 600;">Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (const [algo, detail] of Object.entries(data.ket_qua)) {
+        if (detail.thanh_cong) {
+          const t_tao_khoa = detail.thoi_gian_tao_khoa_ms ? `<span style="color: var(--dong-sang);">Sinh khóa: ${detail.thoi_gian_tao_khoa_ms} ms</span>` : "-";
+          html += `<tr style="border-bottom: 1px solid var(--vien);">
+            <td style="padding: 10px; font-weight: 600; color: var(--chu);">${algo}</td>
+            <td style="padding: 10px; color: var(--xanh); font-weight: 600;">Thành công</td>
+            <td style="padding: 10px; font-family: monospace; color: var(--dong-sang);">${detail.thoi_gian_ma_hoa_ms.toFixed(4)} ms</td>
+            <td style="padding: 10px; font-family: monospace; color: var(--dong-sang);">${detail.thoi_gian_giai_ma_ms.toFixed(4)} ms</td>
+            <td style="padding: 10px; font-size: 0.8rem; color: var(--chu-mo);">${t_tao_khoa}</td>
+          </tr>`;
+        } else {
+          html += `<tr style="border-bottom: 1px solid var(--vien);">
+            <td style="padding: 10px; font-weight: 600; color: var(--chu);">${algo}</td>
+            <td style="padding: 10px; color: var(--do); font-weight: 600;">Lỗi</td>
+            <td style="padding: 10px; color: var(--chu-mo);" colspan="2">-</td>
+            <td style="padding: 10px; font-size: 0.8rem; color: var(--do);">${detail.loi}</td>
+          </tr>`;
+        }
+      }
+      html += `</tbody></table></div>`;
+      hienKetQua(vungHienThi, true, `<strong>Kết quả so sánh (${data.do_dai_van_ban} bytes, ${data.so_lan_lap} lần lặp):</strong>` + html);
+    } else {
+      hienKetQua(vungHienThi, false, "Lỗi: " + data.loi);
+    }
+  } catch (err) {
+    hienKetQua(vungHienThi, false, "Không thể kết nối tới máy chủ: " + err.message);
+  } finally {
+    nut.disabled = false;
+    nut.textContent = "Bắt đầu so sánh";
+  }
+});
+
+// ---------- 5. Đánh giá chất lượng ảnh (Tính PSNR) ----------
+document.getElementById("btn-psnr").addEventListener("click", async () => {
+  const oAnhGoc = document.getElementById("psnr-anh-goc");
+  const oAnhNhung = document.getElementById("psnr-anh-nhung");
+  const vungHienThi = document.getElementById("ket-qua-psnr");
+  const nut = document.getElementById("btn-psnr");
+
+  if (!oAnhGoc.files[0] || !oAnhNhung.files[0]) {
+    hienKetQua(vungHienThi, false, "Vui lòng chọn cả ảnh gốc và ảnh đã nhúng.");
+    return;
+  }
+
+  const duLieu = new FormData();
+  duLieu.append("anh_goc", oAnhGoc.files[0]);
+  duLieu.append("anh_da_nhung", oAnhNhung.files[0]);
+
+  nut.disabled = true;
+  nut.textContent = "Đang tính PSNR...";
+
+  try {
+    const res = await fetch("/api/psnr", { method: "POST", body: duLieu });
+    const data = await res.json();
+
+    if (data.thanh_cong) {
+      const psnrText = data.vo_han ? "Vô hạn (inf)" : `${data.psnr_db} dB`;
+      hienKetQua(vungHienThi, true, `
+        <strong>Chỉ số PSNR:</strong> <span style="font-size: 1.15rem; font-weight: bold; color: var(--xanh);">${psnrText}</span><br>
+        <strong>Đánh giá chất lượng:</strong> ${data.danh_gia}
+      `);
+    } else {
+      hienKetQua(vungHienThi, false, "Lỗi: " + data.loi);
+    }
+  } catch (err) {
+    hienKetQua(vungHienThi, false, "Không thể kết nối tới máy chủ: " + err.message);
+  } finally {
+    nut.disabled = false;
+    nut.textContent = "Tính toán PSNR";
   }
 });
 </script>

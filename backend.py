@@ -2,6 +2,7 @@
 Backend xử lý nhúng/trích xuất watermark bằng kỹ thuật LSB (Least Significant Bit).
 """
  
+import math
 from PIL import Image
 from thuat_toan_ma_hoa import ky_so_rsa, kiem_tra_ky_so_rsa
  
@@ -146,4 +147,69 @@ def trich_xuat_va_kiem_tra_chu_ky(anh_da_nhung, khoa_cong_khai_rsa):
         return watermark_da_ma_hoa, True
     else:
         return None, False
- 
+
+
+def tinh_psnr(anh_goc, anh_da_nhung):
+    """
+    Tính PSNR (Peak Signal-to-Noise Ratio) giữa ảnh gốc và ảnh đã nhúng watermark,
+    dùng để đánh giá mức độ "vô hình" của watermark: PSNR càng cao thì sai khác
+    giữa hai ảnh càng khó nhận biết bằng mắt thường.
+
+    Công thức: PSNR = 10 * log10(MAX^2 / MSE), với MAX = 255 (ảnh 8-bit/kênh)
+    và MSE là sai số bình phương trung bình trên cả 3 kênh màu RGB.
+
+    Args:
+        anh_goc: BytesIO hoặc file ảnh gốc (trước khi nhúng)
+        anh_da_nhung: BytesIO hoặc file ảnh sau khi nhúng watermark
+
+    Returns:
+        PSNR tính bằng dB (float),
+        float('inf') nếu hai ảnh giống hệt nhau (không có sai khác),
+        hoặc None nếu kích thước hai ảnh không khớp (không thể so sánh)
+    """
+    img1 = Image.open(anh_goc).convert('RGB')
+    img2 = Image.open(anh_da_nhung).convert('RGB')
+
+    if img1.size != img2.size:
+        return None
+
+    pixels1 = img1.getdata()
+    pixels2 = img2.getdata()
+
+    tong_binh_phuong_loi = 0
+    so_gia_tri = img1.size[0] * img1.size[1] * 3  # 3 kênh RGB
+
+    for (r1, g1, b1), (r2, g2, b2) in zip(pixels1, pixels2):
+        tong_binh_phuong_loi += (r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2
+
+    if tong_binh_phuong_loi == 0:
+        return float('inf')
+
+    mse = tong_binh_phuong_loi / so_gia_tri
+    MAX_GIA_TRI_PIXEL = 255.0
+
+    return 10 * math.log10((MAX_GIA_TRI_PIXEL ** 2) / mse)
+
+
+def danh_gia_psnr(psnr):
+    """
+    Trả về đánh giá định tính (chuỗi mô tả) cho một giá trị PSNR (dB), theo các
+    ngưỡng phổ biến trong watermarking ảnh.
+
+    Args:
+        psnr: giá trị PSNR (float), hoặc None, hoặc float('inf')
+
+    Returns:
+        Chuỗi mô tả mức độ "vô hình" của watermark
+    """
+    if psnr is None:
+        return "Không thể đánh giá (kích thước ảnh không khớp)."
+    if psnr == float('inf'):
+        return "Hai ảnh giống hệt nhau (không phát hiện sai khác)."
+    if psnr >= 40:
+        return "Rất tốt — watermark gần như không thể nhận biết bằng mắt thường."
+    if psnr >= 30:
+        return "Tốt — watermark khó nhận biết bằng mắt thường."
+    if psnr >= 20:
+        return "Trung bình — có thể nhận thấy sai khác nhẹ khi quan sát kỹ."
+    return "Kém — sai khác dễ nhận biết bằng mắt thường."
